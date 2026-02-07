@@ -189,6 +189,11 @@ class _PeerCardState extends State<_PeerCard>
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall,
+                          textDirection: peer.alias.isEmpty
+                              ? TextDirection.ltr
+                              : null,
+                          textAlign:
+                              peer.alias.isEmpty ? TextAlign.left : null,
                         )),
                       ]).marginOnly(top: isPortrait ? 0 : 2),
                       Row(
@@ -371,6 +376,11 @@ class _PeerCardState extends State<_PeerCard>
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall,
+                          textDirection: peer.alias.isEmpty
+                              ? TextDirection.ltr
+                              : null,
+                          textAlign:
+                              peer.alias.isEmpty ? TextAlign.left : null,
                         )),
                       ]).paddingSymmetric(vertical: 8)),
                       checkBoxOrActionMoreLandscape(peer, isTile: false),

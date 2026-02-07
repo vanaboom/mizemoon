@@ -1720,7 +1720,7 @@ mod tests {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (tx, mut rx) = unbounded_channel();
-            let dir = std::env::temp_dir().join("rustdesk_read_all_test");
+            let dir = std::env::temp_dir().join("mizemoon_read_all_test");
             let _ = fs::remove_dir_all(&dir);
             fs::create_dir_all(&dir).unwrap();
             fs::write(dir.join("test.txt"), b"hello").unwrap();
@@ -1746,7 +1746,7 @@ mod tests {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (tx, mut rx) = unbounded_channel();
-            let dir = std::env::temp_dir().join("rustdesk_read_dir_test");
+            let dir = std::env::temp_dir().join("mizemoon_read_dir_test");
             let _ = fs::remove_dir_all(&dir);
             fs::create_dir_all(&dir).unwrap();
 
@@ -1760,7 +1760,7 @@ mod tests {
                         .file_response()
                         .dir()
                         .path
-                        .contains("rustdesk_read_dir_test"));
+                        .contains("mizemoon_read_dir_test"));
                 }
                 _ => panic!("unexpected data"),
             }
@@ -1809,7 +1809,7 @@ mod tests {
     #[test]
     #[cfg(not(any(target_os = "ios")))]
     fn test_symlink_creation_works() {
-        let base_dir = std::env::temp_dir().join("rustdesk_symlink_test");
+        let base_dir = std::env::temp_dir().join("mizemoon_symlink_test");
         let _ = fs::remove_dir_all(&base_dir);
         fs::create_dir_all(&base_dir).unwrap();
 

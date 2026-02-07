@@ -8,8 +8,8 @@
  <string>HZF9JMC8YN</string>
  <key>provisioningProfiles</key>
  <dict>
- <key>com.carriez.flutterHbb</key>
- <string>rustdesk-ios-prod-app-store</string>
+ <key>ir.mizemoon.mizemoon</key>
+ <string>mizemoon-ios-prod-app-store</string>
  </dict>
  </dict>
  </plist>

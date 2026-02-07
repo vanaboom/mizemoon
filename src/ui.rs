@@ -41,17 +41,21 @@ pub fn start(args: &mut [String]) {
     crate::platform::delegate::show_dock();
     #[cfg(all(target_os = "linux", feature = "inline"))]
     {
-        let app_dir = std::env::var("APPDIR").unwrap_or("".to_string());
-        let mut so_path = "/usr/share/rustdesk/libsciter-gtk.so".to_owned();
-        for (prefix, dir) in [
-            ("", "/usr"),
-            ("", "/app"),
-            (&app_dir, "/usr"),
-            (&app_dir, "/app"),
+        let app_dir = std::env::var("APPDIR").unwrap_or_default();
+        let mut so_path = "/usr/share/mizemoon/libsciter-gtk.so".to_owned();
+        for (prefix, dir, share_dir) in [
+            ("", "/usr", "mizemoon"),
+            ("", "/app", "mizemoon"),
+            (&app_dir, "/usr", "mizemoon"),
+            (&app_dir, "/app", "mizemoon"),
+            ("", "/usr", "rustdesk"),
+            ("", "/app", "rustdesk"),
+            (&app_dir, "/usr", "rustdesk"),
+            (&app_dir, "/app", "rustdesk"),
         ]
         .iter()
         {
-            let path = format!("{prefix}{dir}/share/rustdesk/libsciter-gtk.so");
+            let path = format!("{prefix}{dir}/share/{share_dir}/libsciter-gtk.so");
             if std::path::Path::new(&path).exists() {
                 so_path = path;
                 break;

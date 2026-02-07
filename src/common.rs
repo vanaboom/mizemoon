@@ -53,7 +53,7 @@ pub enum GrabState {
 pub type NotifyMessageBox = fn(String, String, String, String) -> dyn Future<Output = ()>;
 
 // the executable name of the portable version
-pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
+pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "MIZEMOON_APPNAME";
 
 pub const PLATFORM_WINDOWS: &str = "Windows";
 pub const PLATFORM_LINUX: &str = "Linux";
@@ -64,6 +64,14 @@ pub const TIMER_OUT: Duration = Duration::from_secs(1);
 pub const DEFAULT_KEEP_ALIVE: i32 = 60_000;
 
 const MIN_VER_MULTI_UI_SESSION: &str = "1.2.4";
+
+// Custom build: keep update code but disable update checks by default.
+pub const DISABLE_SOFTWARE_UPDATE_CHECK: bool = true;
+
+#[inline]
+pub fn is_software_update_disabled() -> bool {
+    DISABLE_SOFTWARE_UPDATE_CHECK
+}
 
 pub mod input {
     pub const MOUSE_TYPE_MOVE: i32 = 0;
@@ -940,7 +948,7 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 }
 
 pub fn check_software_update() {
-    if is_custom_client() {
+    if is_software_update_disabled() || is_custom_client() {
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
@@ -950,9 +958,14 @@ pub fn check_software_update() {
 }
 
 // No need to check `danger_accept_invalid_cert` for now.
-// Because the url is always `https://api.rustdesk.com/version/latest`.
+// Because the url is always `https://desk.mizemoon.ir/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    if is_software_update_disabled() {
+        *SOFTWARE_UPDATE_URL.lock().unwrap() = "".to_string();
+        log::debug!("Software update check disabled.");
+        return Ok(());
+    }
     let (request, url) =
         hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
     let proxy_conf = Config::get_socks();
@@ -1081,12 +1094,12 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://admin.rustdesk.com".to_owned()
+    "https://desk.mizemoon.ir".to_owned()
 }
 
 #[inline]
 pub fn is_public(url: &str) -> bool {
-    url.contains("rustdesk.com/") || url.ends_with("rustdesk.com")
+    url.contains("mizemoon.ir/") || url.ends_with("mizemoon.ir")
 }
 
 pub fn get_udp_punch_enabled() -> bool {
@@ -1634,7 +1647,7 @@ pub fn check_process(arg: &str, mut same_uid: bool) -> bool {
         if same_uid && p.user_id() != my_uid {
             continue;
         }
-        // on mac, p.cmd() get "/Applications/RustDesk.app/Contents/MacOS/RustDesk", "XPC_SERVICE_NAME=com.carriez.RustDesk_server"
+        // on mac, p.cmd() get "/Applications/MizeMoon.app/Contents/MacOS/MizeMoon", "XPC_SERVICE_NAME=ir.mizemoon.mizemoon_server"
         let parg = if p.cmd().len() <= 1 { "" } else { &p.cmd()[1] };
         if arg.is_empty() {
             if !parg.starts_with("--") {
@@ -1983,7 +1996,7 @@ pub fn get_builtin_option(key: &str) -> String {
 
 #[inline]
 pub fn is_custom_client() -> bool {
-    get_app_name() != "RustDesk"
+    get_app_name() != "MizeMoon"
 }
 
 pub fn verify_login(_raw: &str, _id: &str) -> bool {
@@ -2464,25 +2477,25 @@ mod tests {
 
     #[test]
     fn test_is_public() {
-        // Test URLs containing "rustdesk.com/"
-        assert!(is_public("https://rustdesk.com/"));
-        assert!(is_public("https://www.rustdesk.com/"));
-        assert!(is_public("https://api.rustdesk.com/v1"));
-        assert!(is_public("https://rustdesk.com/path"));
+        // Test URLs containing "mizemoon.ir/"
+        assert!(is_public("https://mizemoon.ir/"));
+        assert!(is_public("https://www.mizemoon.ir/"));
+        assert!(is_public("https://desk.mizemoon.ir/v1"));
+        assert!(is_public("https://mizemoon.ir/path"));
 
-        // Test URLs ending with "rustdesk.com"
-        assert!(is_public("rustdesk.com"));
-        assert!(is_public("https://rustdesk.com"));
-        assert!(is_public("http://www.rustdesk.com"));
-        assert!(is_public("https://api.rustdesk.com"));
+        // Test URLs ending with "mizemoon.ir"
+        assert!(is_public("mizemoon.ir"));
+        assert!(is_public("https://mizemoon.ir"));
+        assert!(is_public("http://www.mizemoon.ir"));
+        assert!(is_public("https://desk.mizemoon.ir"));
 
         // Test non-public URLs
         assert!(!is_public("https://example.com"));
         assert!(!is_public("https://custom-server.com"));
         assert!(!is_public("http://192.168.1.1"));
         assert!(!is_public("localhost"));
-        assert!(!is_public("https://rustdesk.computer.com"));
-        assert!(!is_public("rustdesk.comhello.com"));
+        assert!(!is_public("https://mizemoon.irputer.com"));
+        assert!(!is_public("mizemoon.irhello.com"));
     }
 
     #[test]

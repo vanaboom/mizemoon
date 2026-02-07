@@ -555,6 +555,8 @@ class _AddressBookState extends State<AddressBook> {
                     input: Obx(() => TextField(
                           controller: idController,
                           inputFormatters: [IDTextInputFormatter()],
+                          textDirection: TextDirection.ltr,
+                          textAlign: TextAlign.left,
                           decoration: InputDecoration(
                               labelText: stateGlobal.isPortrait.isFalse
                                   ? null

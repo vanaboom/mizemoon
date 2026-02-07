@@ -30,11 +30,17 @@ pub fn update_controlling_session_count(count: usize) {
 
 #[allow(dead_code)]
 pub fn start_auto_update() {
+    if crate::common::is_software_update_disabled() {
+        return;
+    }
     let _sender = TX_MSG.lock().unwrap();
 }
 
 #[allow(dead_code)]
 pub fn manually_check_update() -> ResultType<()> {
+    if crate::common::is_software_update_disabled() {
+        return Ok(());
+    }
     let sender = TX_MSG.lock().unwrap();
     sender.send(UpdateMsg::CheckUpdate)?;
     Ok(())
@@ -42,6 +48,9 @@ pub fn manually_check_update() -> ResultType<()> {
 
 #[allow(dead_code)]
 pub fn stop_auto_update() {
+    if crate::common::is_software_update_disabled() {
+        return;
+    }
     let sender = TX_MSG.lock().unwrap();
     sender.send(UpdateMsg::Exit).unwrap_or_default();
 }
@@ -118,6 +127,9 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
 }
 
 fn check_update(manually: bool) -> ResultType<()> {
+    if crate::common::is_software_update_disabled() {
+        return Ok(());
+    }
     #[cfg(target_os = "windows")]
     let is_msi = crate::platform::is_msi_installed()?;
     if !(manually || config::Config::get_bool_option(config::keys::OPTION_ALLOW_AUTO_UPDATE)) {
@@ -137,13 +149,13 @@ fn check_update(manually: bool) -> ResultType<()> {
         #[cfg(target_os = "windows")]
         let download_url = if cfg!(feature = "flutter") {
             format!(
-                "{}/rustdesk-{}-x86_64.{}",
+                "{}/mizemoon-{}-x86_64.{}",
                 download_url,
                 version,
                 if is_msi { "msi" } else { "exe" }
             )
         } else {
-            format!("{}/rustdesk-{}-x86-sciter.exe", download_url, version)
+            format!("{}/mizemoon-{}-x86-sciter.exe", download_url, version)
         };
         log::debug!("New version available: {}", &version);
         let client = create_http_client_with_url(&download_url);

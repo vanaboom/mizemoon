@@ -435,17 +435,17 @@ class _GeneralState extends State<_General> {
 
     final isOptFixed = isOptionFixed(kCommConfKeyTheme);
     return _Card(title: 'Theme', children: [
-      _Radio<String>(context,
+      _Radio(context,
           value: 'light',
           groupValue: current,
           label: 'Light',
           onChanged: isOptFixed ? null : onChanged),
-      _Radio<String>(context,
+      _Radio(context,
           value: 'dark',
           groupValue: current,
           label: 'Dark',
           onChanged: isOptFixed ? null : onChanged),
-      _Radio<String>(context,
+      _Radio(context,
           value: 'system',
           groupValue: current,
           label: 'Follow System',
@@ -1084,7 +1084,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
           String currentValue =
               passwordValues[passwordKeys.indexOf(model.verificationMethod)];
           List<Widget> radios = passwordValues
-              .map((value) => _Radio<String>(
+              .map<Widget>((value) => _Radio(
                     context,
                     value: value,
                     groupValue: currentValue,
@@ -1639,6 +1639,7 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
         );
 
     final outgoingOnly = bind.isOutgoingOnly();
+    final showServer = !hideServer && !kHideIdRelaySettings;
 
     final divider = const Divider(height: 1, indent: 16, endIndent: 16);
     return _Card(
@@ -1648,20 +1649,20 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!hideServer)
+              if (showServer)
                 listTile(
                   icon: Icons.dns_outlined,
                   title: 'ID/Relay Server',
                   onTap: () => showServerSettings(gFFI.dialogManager, setState),
                 ),
-              if (!hideProxy && !hideServer) divider,
+              if (!hideProxy && showServer) divider,
               if (!hideProxy)
                 listTile(
                   icon: Icons.network_ping_outlined,
                   title: 'Socks5/Http(s) Proxy',
                   onTap: changeSocks5Proxy,
                 ),
-              if (!hideWebSocket && (!hideServer || !hideProxy)) divider,
+              if (!hideWebSocket && (showServer || !hideProxy)) divider,
               if (!hideWebSocket)
                 switchWidget(
                     Icons.web_asset_outlined,
@@ -1677,7 +1678,7 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
                     } else {
                       return Column(
                         children: [
-                          if (!hideServer || !hideProxy || !hideWebSocket)
+                          if (showServer || !hideProxy || !hideWebSocket)
                             divider,
                           switchWidget(
                               Icons.no_encryption_outlined,
@@ -1749,7 +1750,8 @@ class _DisplayState extends State<_Display> {
       setState(() {});
     }
 
-    final groupValue = bind.mainGetUserDefaultOption(key: kOptionViewStyle);
+    final String groupValue =
+        bind.mainGetUserDefaultOption(key: kOptionViewStyle);
     return _Card(title: 'Default View Style', children: [
       _Radio(context,
           value: kRemoteViewStyleOriginal,
@@ -1772,7 +1774,8 @@ class _DisplayState extends State<_Display> {
       setState(() {});
     }
 
-    final groupValue = bind.mainGetUserDefaultOption(key: kOptionScrollStyle);
+    final String groupValue =
+        bind.mainGetUserDefaultOption(key: kOptionScrollStyle);
 
     onEdgeScrollEdgeThicknessChanged(double value) async {
       await bind.mainSetUserDefaultOption(
@@ -1819,7 +1822,8 @@ class _DisplayState extends State<_Display> {
     }
 
     final isOptFixed = isOptionFixed(kOptionImageQuality);
-    final groupValue = bind.mainGetUserDefaultOption(key: kOptionImageQuality);
+    final String groupValue =
+        bind.mainGetUserDefaultOption(key: kOptionImageQuality);
     return _Card(title: 'Default Image Quality', children: [
       _Radio(context,
           value: kRemoteImageQualityBest,
@@ -1875,7 +1879,7 @@ class _DisplayState extends State<_Display> {
       setState(() {});
     }
 
-    final groupValue =
+    final String groupValue =
         bind.mainGetUserDefaultOption(key: kOptionCodecPreference);
     var hwRadios = [];
     final isOptFixed = isOptionFixed(kOptionCodecPreference);
@@ -2335,7 +2339,7 @@ class _AboutState extends State<_About> {
                         .marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com/privacy.html');
+                    launchUrlString(kBrandPrivacy);
                   },
                   child: Text(
                     translate('Privacy Statement'),
@@ -2343,7 +2347,7 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com');
+                    launchUrlString(kBrandHomepage);
                   },
                   child: Text(
                     translate('Website'),
@@ -2498,14 +2502,14 @@ Widget _OptionCheckBox(
 }
 
 // ignore: non_constant_identifier_names
-Widget _Radio<T>(BuildContext context,
-    {required T value,
-    required T groupValue,
+Widget _Radio(BuildContext context,
+    {required String value,
+    required String groupValue,
     required String label,
-    required Function(T value)? onChanged,
+    required FutureOr<void> Function(String value)? onChanged,
     bool autoNewLine = true}) {
   final onChange2 = onChanged != null
-      ? (T? value) {
+      ? (String? value) {
           if (value != null) {
             onChanged(value);
           }
@@ -2514,7 +2518,8 @@ Widget _Radio<T>(BuildContext context,
   return GestureDetector(
     child: Row(
       children: [
-        Radio<T>(value: value, groupValue: groupValue, onChanged: onChange2),
+        Radio<String>(
+            value: value, groupValue: groupValue, onChanged: onChange2),
         Expanded(
           child: Text(translate(label),
                   overflow: autoNewLine ? null : TextOverflow.ellipsis,

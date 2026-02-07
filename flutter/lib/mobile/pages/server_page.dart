@@ -526,6 +526,8 @@ class ServerInfo extends StatelessWidget {
               Text(
                 model.serverId.value.text,
                 style: textStyleValue,
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.left,
               ),
               IconButton(
                   visualDensity: VisualDensity.compact,

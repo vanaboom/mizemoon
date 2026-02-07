@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=/usr/lib/x86_64-linux-gnu
+includedir=/usr/include
+
+Name: libyuv
+Description: libyuv
+Version: 0
+Libs: -L${libdir} -lyuv
+Cflags: -I${includedir}

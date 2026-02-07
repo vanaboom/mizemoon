@@ -1,0 +1,109 @@
+# mizemoon (RustDesk fork) – Build Notes
+
+## Quick Context
+- This repo is a rebrand of `rustdesk/rustdesk` to **mizemoon**.
+- Flutter UI is used; Rust core builds the native library.
+- Linux `.deb` and Android APK builds were validated in this workspace.
+
+## Paths Used Here
+- Flutter SDK: `/home/mohsen/flutter/bin/flutter`
+- Android SDK: `/home/mohsen/Android/Sdk`
+- Android NDK: `/home/mohsen/Android/Sdk/ndk/29.0.14206865`
+- VCPKG: `/home/mohsen/vcpkg`
+- Android keystore: `/home/mohsen/Desktop/androidKeys/shuttle/vanaboom.key`  
+  (Passwords are **not** stored here; keep them private.)
+
+## Linux (.deb) Build (with hwcodec)
+### System deps (Mint/Ubuntu)
+Install ffmpeg + gtk + gstreamer + others as needed (example):
+```
+sudo apt install -y \
+  libgtk-3-dev libappindicator3-dev libclang-dev libpipewire-0.3-dev \
+  libpulse-dev libusb-1.0-0-dev libxdo-dev libxrandr-dev \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  libva-dev libva-drm2 libva-x11-2 \
+  libvpx-dev libyuv-dev libaom-dev libopus-dev \
+  libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+```
+
+### hwcodec build uses pkg-config (not vcpkg) on Linux
+- Local crate exists at `libs/hwcodec`.
+- `libs/scrap/Cargo.toml` points to `path = "../hwcodec"`.
+- `libs/hwcodec/build.rs` uses pkg-config on Linux when:
+  - `HWCODEC_USE_PKG_CONFIG=1` **or** `VCPKG_ROOT` missing.
+- `res/pkgconfig/libyuv.pc` exists because Mint’s `libyuv-dev` lacks a `.pc`.
+  - Use `PKG_CONFIG_PATH=/home/mohsen/dev/mizemoon/app/res/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig`.
+
+### Build commands
+```
+export PATH=/home/mohsen/flutter/bin:$PATH
+export PKG_CONFIG_PATH=/home/mohsen/dev/mizemoon/app/res/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig
+export HWCODEC_USE_PKG_CONFIG=1
+
+cargo build --features "hwcodec,flutter,linux-pkg-config" --lib --release
+python3 build.py --flutter --hwcodec --skip-cargo
+```
+Output: `mizemoon-*.deb` in repo root.
+
+## Android APK Build (arm64)
+### Env
+```
+export ANDROID_SDK_ROOT=/home/mohsen/Android/Sdk
+export ANDROID_NDK_HOME=/home/mohsen/Android/Sdk/ndk/29.0.14206865
+export ANDROID_NDK_ROOT=$ANDROID_NDK_HOME
+export VCPKG_ROOT=/home/mohsen/vcpkg
+export PATH=/home/mohsen/flutter/bin:$PATH
+```
+
+### Build Android deps
+```
+./flutter/build_android_deps.sh arm64-v8a
+```
+
+### Rust (Android) build
+```
+rustup target add aarch64-linux-android armv7-linux-androideabi
+cargo install cargo-ndk
+
+cargo ndk --platform 21 --target aarch64-linux-android \
+  build --release --features flutter,hwcodec
+```
+
+Copy the native libs:
+```
+mkdir -p flutter/android/app/src/main/jniLibs/arm64-v8a
+cp target/aarch64-linux-android/release/librustdesk.so \
+  flutter/android/app/src/main/jniLibs/arm64-v8a/
+cp $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so \
+  flutter/android/app/src/main/jniLibs/arm64-v8a/
+strip flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
+```
+
+### Flutter build
+```
+cd flutter
+flutter clean
+flutter pub get
+flutter build apk --target-platform android-arm64 --release
+```
+
+### Maven/TLS workaround
+If Gradle fails fetching from Maven Central, `flutter/android/build.gradle` already includes:
+```
+maven { url 'https://maven.aliyun.com/repository/public' }
+maven { url 'https://maven.aliyun.com/repository/google' }
+mavenCentral()
+```
+
+### Kotlin version
+`flutter/android/settings.gradle` uses:
+```
+id "org.jetbrains.kotlin.android" version "1.9.10"
+```
+
+## Rebrand reminders
+- App name: **mizemoon** (not rustdesk).
+- Rendezvous servers and pubkey customized in `libs/hbb_common/src/config.rs`.
+- Linux sciter path uses `/usr/share/mizemoon` with fallback to `/usr/share/rustdesk`.

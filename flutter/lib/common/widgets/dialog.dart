@@ -136,6 +136,8 @@ void changeIdDialog() {
                 errorText: msg.isEmpty ? null : translate(msg),
                 suffixText: '${rxId.value.length}/16',
                 suffixStyle: const TextStyle(fontSize: 12, color: Colors.grey)),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
             inputFormatters: [
               LengthLimitingTextInputFormatter(16),
               // FilteringTextInputFormatter(RegExp(r"[a-zA-z][a-zA-z0-9\_]*"), allow: true)
@@ -1366,7 +1368,7 @@ showSetOSPassword(
   var autoLogin =
       await bind.sessionGetOption(sessionId: sessionId, arg: 'auto-login') !=
           '';
-  controller.text = osPassword;
+  controller.text = osPassword ?? '';
   dialogManager.show((setState, close, context) {
     closeWithCallback([dynamic]) {
       close();

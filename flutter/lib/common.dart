@@ -375,6 +375,7 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
+    fontFamily: 'IRANSansX',
     hoverColor: Color.fromARGB(255, 224, 224, 224),
     scaffoldBackgroundColor: Colors.white,
     dialogBackgroundColor: Colors.white,
@@ -473,6 +474,7 @@ class MyTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
+    fontFamily: 'IRANSansX',
     hoverColor: Color.fromARGB(255, 45, 46, 53),
     scaffoldBackgroundColor: Color(0xFF18191E),
     dialogBackgroundColor: Color(0xFF18191E),
@@ -1043,6 +1045,108 @@ void showToast(String text,
   Future.delayed(timeout, () {
     entry.remove();
   });
+}
+
+void showErrorToast(String text,
+    {Duration timeout = const Duration(seconds: 4),
+    Alignment alignment = const Alignment(0.0, 0.8)}) {
+  final overlayState = globalKey.currentState?.overlay;
+  if (overlayState == null) return;
+  final entry = OverlayEntry(builder: (context) {
+    return IgnorePointer(
+        child: Align(
+            alignment: alignment,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFD32F2F),
+                borderRadius: BorderRadius.all(
+                  Radius.circular(20),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    decoration: TextDecoration.none,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 18,
+                    color: Colors.white),
+              ),
+            )));
+  });
+  overlayState.insert(entry);
+  Future.delayed(timeout, () {
+    entry.remove();
+  });
+}
+
+bool _legacyAuthStarted = false;
+
+Future<void> legacyAuthAndApplyConfig() async {
+  if (_legacyAuthStarted) return;
+  _legacyAuthStarted = true;
+
+  try {
+    final resp = await http.post(Uri.parse(kLegacyAuthUrl));
+
+    if (resp.statusCode != 200) {
+      showErrorToast('خطا در احراز (کد ${resp.statusCode})');
+      return;
+    }
+
+    var body = resp.body.trim();
+    if (body.isEmpty) {
+      showErrorToast('خطا در احراز');
+      return;
+    }
+
+    body = _extractLegacyConfigPayload(body);
+    if (body.isEmpty) {
+      showErrorToast('خطا در احراز');
+      return;
+    }
+
+    final sc = ServerConfig.decode(body);
+    if (sc.idServer.isEmpty) {
+      showErrorToast('خطا در احراز');
+      return;
+    }
+
+    await setServerConfig(null, null, sc);
+    showToast('احراز شد');
+  } catch (e) {
+    showErrorToast('خطا در احراز');
+  }
+}
+
+String _extractLegacyConfigPayload(String body) {
+  var payload = body.trim();
+  if (payload.startsWith('config=')) {
+    payload = payload.substring(7);
+  }
+  if (payload.startsWith('{')) {
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        if (decoded['config'] is String) {
+          return (decoded['config'] as String).trim();
+        }
+        if (decoded['data'] is String) {
+          return (decoded['data'] as String).trim();
+        }
+        if (decoded.containsKey('host') ||
+            decoded.containsKey('relay') ||
+            decoded.containsKey('api') ||
+            decoded.containsKey('key')) {
+          return payload;
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+  }
+  return payload;
 }
 
 // TODO
@@ -2007,7 +2111,7 @@ Future<bool> restoreWindowPosition(WindowType type,
   }
   pos ??= bind.getLocalFlutterOption(k: windowFramePrefix + type.name);
 
-  var lpos = LastWindowPosition.loadFromString(pos);
+  var lpos = LastWindowPosition.loadFromString(pos ?? '');
   if (lpos == null) {
     debugPrint("No window position saved, trying to center the window.");
     switch (type) {
@@ -2779,7 +2883,7 @@ Future<void> onActiveWindowChanged() async {
     } catch (err) {
       debugPrintStack(label: "$err");
     } finally {
-      debugPrint("Start closing RustDesk...");
+      debugPrint("Start closing MizeMoon...");
       await windowManager.setPreventClose(false);
       await windowManager.close();
       if (isMacOS) {
@@ -2996,7 +3100,7 @@ Future<void> updateSystemWindowTheme() async {
 ///
 /// Note: not found a general solution for rust based AVFoundation bingding.
 /// [AVFoundation] crate has compile error.
-const kMacOSPermChannel = MethodChannel("org.rustdesk.rustdesk/host");
+const kMacOSPermChannel = MethodChannel("ir.mizemoon.mizemoon/host");
 
 enum PermissionAuthorizeType {
   undetermined,
@@ -3655,7 +3759,7 @@ Widget loadPowered(BuildContext context) {
     cursor: SystemMouseCursors.click,
     child: GestureDetector(
       onTap: () {
-        launchUrl(Uri.parse('https://rustdesk.com'));
+        launchUrl(Uri.parse(kBrandHomepage));
       },
       child: Opacity(
           opacity: 0.5,
@@ -3864,8 +3968,30 @@ get defaultOptionWhitelist => isCustomClient ? ',' : '';
 get defaultOptionAccessMode => isCustomClient ? 'custom' : '';
 get defaultOptionApproveMode => isCustomClient ? 'password-click' : '';
 
+Future<void> ensureDefaultLanguage() async {
+  final cur = bind.mainGetLocalOption(key: kCommConfKeyLang);
+  if (cur.isEmpty) {
+    await bind.mainSetLocalOption(key: kCommConfKeyLang, value: kDefaultLanguage);
+    if (!isWeb) {
+      await bind.mainChangeLanguage(lang: kDefaultLanguage);
+    }
+  }
+}
+
+TextDirection currentTextDirection() {
+  var lang = bind.mainGetLocalOption(key: kCommConfKeyLang).trim();
+  if (lang.isEmpty || lang == 'default') {
+    lang = localeName;
+  }
+  final norm = lang.toLowerCase().replaceAll('_', '-');
+  if (norm.startsWith('fa') || norm.startsWith('ar')) {
+    return TextDirection.rtl;
+  }
+  return TextDirection.ltr;
+}
+
 bool whitelistNotEmpty() {
-  // https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/#whitelist
+  // https://mizemoon.ir/docs/en/self-host/client-configuration/advanced-settings/#whitelist
   final v = bind.mainGetOptionSync(key: kOptionWhitelist);
   return v != '' && v != ',';
 }

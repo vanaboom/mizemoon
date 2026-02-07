@@ -126,6 +126,7 @@ Future<void> initEnv(String appType) async {
   // for convenience, use global FFI on mobile platform
   // focus on multi-ffi on desktop first
   await initGlobalFFI();
+  await ensureDefaultLanguage();
   // await Firebase.initializeApp();
   _registerEventHandler();
   // Update the system theme.
@@ -146,6 +147,7 @@ void runMainApp(bool startService) async {
   await Future.wait([gFFI.abModel.loadCache(), gFFI.groupModel.loadCache()]);
   gFFI.userModel.refreshCurrentUser();
   runApp(App());
+  Future.delayed(const Duration(milliseconds: 300), legacyAuthAndApplyConfig);
 
   bool? alwaysOnTop;
   if (isDesktop) {
@@ -186,6 +188,7 @@ void runMobileApp() async {
   await Future.wait([gFFI.abModel.loadCache(), gFFI.groupModel.loadCache()]);
   gFFI.userModel.refreshCurrentUser();
   runApp(App());
+  Future.delayed(const Duration(milliseconds: 300), legacyAuthAndApplyConfig);
   await initUniLinks();
 }
 
@@ -381,6 +384,10 @@ void _runApp(
       ],
       builder: (context, child) {
         child = _keepScaleBuilder(context, child);
+        child = Directionality(
+          textDirection: currentTextDirection(),
+          child: child ?? Container(),
+        );
         child = botToastBuilder(context, child);
         return child;
       },
@@ -526,11 +533,18 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                       data: MediaQuery.of(context).copyWith(
                         textScaler: TextScaler.linear(1.0),
                       ),
-                      child: child ?? Container(),
+                      child: Directionality(
+                        textDirection: currentTextDirection(),
+                        child: child ?? Container(),
+                      ),
                     ),
                   )
               : (context, child) {
                   child = _keepScaleBuilder(context, child);
+                  child = Directionality(
+                    textDirection: currentTextDirection(),
+                    child: child ?? Container(),
+                  );
                   child = botToastBuilder(context, child);
                   if ((isDesktop && desktopType == DesktopType.main) ||
                       isWebDesktop) {

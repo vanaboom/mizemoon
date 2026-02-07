@@ -41,7 +41,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   double? get height => bind.isIncomingOnly() ? null : em * 3;
 
   void onUsePublicServerGuide() {
-    const url = "https://rustdesk.com/pricing";
+    const url = kBrandPricing;
     canLaunchUrlString(url).then((can) {
       if (can) {
         launchUrlString(url);
@@ -416,8 +416,10 @@ class _ConnectionPageState extends State<ConnectionPage>
                           enableSuggestions: false,
                           keyboardType: TextInputType.visiblePassword,
                           focusNode: fieldFocusNode,
+                          textDirection: TextDirection.ltr,
+                          textAlign: TextAlign.left,
                           style: const TextStyle(
-                            fontFamily: 'WorkSans',
+                            fontFamily: 'IRANSansX',
                             fontSize: 22,
                             height: 1.4,
                           ),
@@ -463,7 +465,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                     maxHeight = maxHeight.clamp(0, 200);
 
                     return Align(
-                      alignment: Alignment.topLeft,
+                      alignment: AlignmentDirectional.topStart,
                       child: Container(
                           decoration: BoxDecoration(
                             boxShadow: [

@@ -712,23 +712,27 @@ class _PopupMenuRouteLayout extends SingleChildLayoutDelegate {
 
     // Find the ideal horizontal position.
     double x;
-    // if (position.left > position.right) {
-    //   // Menu button is closer to the right edge, so grow to the left, aligned to the right edge.
-    //   x = size.width - position.right - childSize.width;
-    // } else if (position.left < position.right) {
-    //   // Menu button is closer to the left edge, so grow to the right, aligned to the left edge.
-    //   x = position.left;
-    // } else {
-    // Menu button is equidistant from both edges, so grow in reading direction.
-    switch (textDirection) {
-      case TextDirection.rtl:
-        x = size.width - position.right - childSize.width;
-        break;
-      case TextDirection.ltr:
-        x = position.left;
-        break;
+    final double delta = (position.left - position.right).abs();
+    if (delta < 0.5) {
+      // Point anchor (e.g. context menu at cursor): keep the exact x position.
+      x = position.left;
+    } else if (position.left > position.right) {
+      // Menu button is closer to the right edge, so grow to the left, aligned to the right edge.
+      x = size.width - position.right - childSize.width;
+    } else if (position.left < position.right) {
+      // Menu button is closer to the left edge, so grow to the right, aligned to the left edge.
+      x = position.left;
+    } else {
+      // Fallback: grow in reading direction.
+      switch (textDirection) {
+        case TextDirection.rtl:
+          x = size.width - position.right - childSize.width;
+          break;
+        case TextDirection.ltr:
+          x = position.left;
+          break;
+      }
     }
-    //}
     final Offset wantedPosition = Offset(x, y);
     final Offset originCenter = position.toRect(Offset.zero & size).center;
     final Iterable<Rect> subScreens =

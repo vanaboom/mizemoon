@@ -13,6 +13,24 @@ const int kMainWindowId = 0;
 
 const kAllDisplayValue = -1;
 
+const bool kHideIdRelaySettings = true;
+const String kLegacyAuthUrl = "https://sauth.mizemoon.ir/legacy";
+const String kBrandName = "MizeMoon";
+const String kBrandHomepage = "https://mizemoon.ir";
+const String kBrandHomepageLabel = "mizemoon.ir";
+const String kBrandPrivacy = "https://mizemoon.ir/privacy.html";
+const String kBrandDownload = "https://mizemoon.ir/download";
+const String kBrandPricing = "https://mizemoon.ir/pricing";
+const String kBrandDocsBase = "https://mizemoon.ir/docs";
+const String kBrandDocsLinuxPermissions =
+    "$kBrandDocsBase/en/client/linux/#permissions-issue";
+const String kBrandDocsLinuxX11 =
+    "$kBrandDocsBase/en/client/linux/#x11-required";
+const String kBrandDocsLinuxLogin =
+    "$kBrandDocsBase/en/client/linux/#login-screen";
+const String kBrandRepoUrl = "https://github.com/vanaboom/mizemoon";
+const String kBrandReleaseTagBase = "$kBrandRepoUrl/releases/tag";
+
 const kKeyLegacyMode = 'legacy';
 const kKeyMapMode = 'map';
 const kKeyTranslateMode = 'translate';
@@ -34,6 +52,8 @@ const String kPeerPlatformLinux = "Linux";
 const String kPeerPlatformMacOS = "Mac OS";
 const String kPeerPlatformAndroid = "Android";
 const String kPeerPlatformWebDesktop = "WebDesktop";
+
+const String kDefaultLanguage = "fa";
 
 const double kScrollbarThickness = 12.0;
 
@@ -229,7 +249,7 @@ const String kKeyReverseMouseWheel = "reverse_mouse_wheel";
 const String kMsgboxTextWaitingForImage = 'Connected, waiting for image...';
 
 // the executable name of the portable version
-const String kEnvPortableExecutable = "RUSTDESK_APPNAME";
+const String kEnvPortableExecutable = "MIZEMOON_APPNAME";
 
 const Color kColorWarn = Color.fromARGB(255, 245, 133, 59);
 const Color kColorCanvas = Colors.black;

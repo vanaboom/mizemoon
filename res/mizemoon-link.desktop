@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MizeMoon
+NoDisplay=true
+MimeType=x-scheme-handler/mizemoon;
+TryExec=mizemoon
+Exec=mizemoon %u
+Icon=mizemoon
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=mizemoon

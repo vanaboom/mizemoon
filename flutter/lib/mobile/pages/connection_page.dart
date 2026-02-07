@@ -124,7 +124,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ? const SizedBox(height: 0)
         : InkWell(
             onTap: () async {
-              final url = 'https://rustdesk.com/download';
+              final url = kBrandDownload;
               // https://pub.dev/packages/url_launcher#configuration
               // https://developer.android.com/training/package-visibility/use-cases#open-urls-custom-tabs
               //
@@ -225,12 +225,14 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         autocorrect: false,
                         enableSuggestions: false,
                         keyboardType: TextInputType.visiblePassword,
+                        textDirection: TextDirection.ltr,
+                        textAlign: TextAlign.left,
                         // keyboardType: TextInputType.number,
                         onChanged: (String text) {
                           _idController.id = text;
                         },
                         style: const TextStyle(
-                          fontFamily: 'WorkSans',
+                          fontFamily: 'IRANSansX',
                           fontWeight: FontWeight.bold,
                           fontSize: 30,
                           color: MyTheme.idColor,
@@ -277,7 +279,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                       }
                       maxHeight = maxHeight.clamp(0, 200);
                       return Align(
-                          alignment: Alignment.topLeft,
+                          alignment: AlignmentDirectional.topStart,
                           child: Container(
                               decoration: BoxDecoration(
                                 boxShadow: [

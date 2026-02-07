@@ -389,4 +389,3 @@ class FloatingWindowService : Service(), View.OnTouchListener {
         return false
     }
 }
-

@@ -86,7 +86,7 @@ class DraggableChatWindow extends StatelessWidget {
                 translate("Chat"),
                 style: const TextStyle(
                     color: Colors.white,
-                    fontFamily: 'WorkSans',
+                    fontFamily: 'IRANSansX',
                     fontWeight: FontWeight.bold,
                     fontSize: 20),
               )),

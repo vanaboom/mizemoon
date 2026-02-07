@@ -198,6 +198,18 @@ class AutocompletePeerTileState extends State<AutocompletePeerTile> {
                                                       style: Theme.of(context)
                                                           .textTheme
                                                           .titleSmall,
+                                                      textDirection: widget
+                                                              .peer
+                                                              .alias
+                                                              .isEmpty
+                                                          ? TextDirection.ltr
+                                                          : null,
+                                                      textAlign: widget
+                                                              .peer
+                                                              .alias
+                                                              .isEmpty
+                                                          ? TextAlign.left
+                                                          : null,
                                                     )),
                                                     widget.peer.alias.isNotEmpty
                                                         ? Padding(
@@ -212,6 +224,12 @@ class AutocompletePeerTileState extends State<AutocompletePeerTile> {
                                                               overflow:
                                                                   TextOverflow
                                                                       .ellipsis,
+                                                              textDirection:
+                                                                  TextDirection
+                                                                      .ltr,
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .left,
                                                             ))
                                                         : Container(),
                                                   ])),

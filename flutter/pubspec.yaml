@@ -154,6 +154,9 @@ flutter:
     - assets/
 
   fonts:
+    - family: IRANSansX
+      fonts:
+        - asset: assets/fonts/IRANSansX-Regular.ttf
     - family: GestureIcons
       fonts:
         - asset: assets/gestures.ttf
