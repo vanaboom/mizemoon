@@ -45,6 +45,16 @@ def system2(cmd):
         sys.exit(-1)
 
 
+def python_cmd(args):
+    python = sys.executable if sys.executable else 'python'
+    system2(f'"{python}" {args}')
+
+
+def pip_install(requirements_file):
+    python = sys.executable if sys.executable else 'python'
+    system2(f'"{python}" -m pip install -r {requirements_file}')
+
+
 def get_version():
     with open("Cargo.toml", encoding="utf-8") as fh:
         for line in fh:
@@ -445,9 +455,9 @@ def build_flutter_windows(version, features, skip_portable_pack):
     if skip_portable_pack:
         return
     os.chdir('libs/portable')
-    system2('pip3 install -r requirements.txt')
-    system2(
-        f'python3 ./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/mizemoon.exe')
+    pip_install('requirements.txt')
+    python_cmd(
+        f'./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/mizemoon.exe')
     os.chdir('../..')
     if os.path.exists('./mizemoon_portable.exe'):
         os.replace('./target/release/rustdesk-portable-packer.exe',
@@ -475,7 +485,7 @@ def main():
     features = ','.join(get_features(args))
     flutter = args.flutter
     if not flutter:
-        system2('python3 res/inline-sciter.py')
+        python_cmd('res/inline-sciter.py')
     print(args.skip_cargo)
     if args.skip_cargo:
         skip_cargo = True
@@ -509,9 +519,9 @@ def main():
         system2(
             f'cp -rf target/release/MizeMoon.exe {res_dir}')
         os.chdir('libs/portable')
-        system2('pip3 install -r requirements.txt')
-        system2(
-            f'python3 ./generate.py -f ../../{res_dir} -o . -e ../../{res_dir}/mizemoon-{version}-win7-install.exe')
+        pip_install('requirements.txt')
+        python_cmd(
+            f'./generate.py -f ../../{res_dir} -o . -e ../../{res_dir}/mizemoon-{version}-win7-install.exe')
         system2('mv ../../{res_dir}/mizemoon-{version}-win7-install.exe ../..')
     elif os.path.isfile('/usr/bin/pacman'):
         # pacman -S -needed base-devel

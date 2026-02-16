@@ -103,6 +103,58 @@ mavenCentral()
 id "org.jetbrains.kotlin.android" version "1.9.10"
 ```
 
+## Windows Build (Flutter, x64)
+### Prerequisites
+- Visual Studio 2022 with `Desktop development with C++` workload.
+- Rust (MSVC toolchain): `rustup default stable-x86_64-pc-windows-msvc`
+- Flutter SDK for Windows and desktop enabled:
+  - `flutter config --enable-windows-desktop`
+  - `flutter doctor -v`
+- vcpkg with required libs:
+  - `vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static`
+
+### Env (PowerShell example)
+```powershell
+$env:VCPKG_ROOT = "C:\vcpkg"
+$env:PATH = "C:\src\flutter\bin;$env:USERPROFILE\.cargo\bin;$env:PATH"
+```
+
+### Build command
+```powershell
+python build.py --flutter --hwcodec
+```
+
+Or run the helper script from repo root (checks prerequisites first):
+```powershell
+.\build-windows.ps1 -VcpkgRoot C:\vcpkg
+```
+
+For automatic tool installation/setup (Rust, Flutter, vcpkg):
+```powershell
+.\setup-windows-tools.ps1 -VcpkgRoot C:\dev\vcpkg -InstallVcpkgDeps
+```
+
+Or let build script trigger setup automatically:
+```powershell
+.\build-windows.ps1 -AutoSetup -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
+```
+
+Include Visual C++ Build Tools in auto setup if needed:
+```powershell
+.\build-windows.ps1 -AutoSetup -InstallVisualCpp -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
+```
+
+### Outputs
+- Main app exe: `flutter/build/windows/x64/runner/Release/mizemoon.exe`
+- Portable/installer exe: `mizemoon-<version>-install.exe` (repo root)
+
+### Notes
+- `build.py` now uses the active Python (`sys.executable`) for `pip` and helper scripts, so `python3/pip3` aliases are not required on Windows.
+- If you only want the Flutter exe and want to skip portable packing:
+  - `python build.py --flutter --hwcodec --skip-portable-pack`
+- If `cargo/rustup/flutter/vcpkg` are missing, use `.\build-windows.ps1 -AutoSetup ...` or run `setup-windows-tools.ps1` first.
+- `build-windows.ps1` tries to load Visual C++ environment automatically via `vswhere` + `vcvars64.bat` if `cl.exe` is not already in PATH.
+
 ## Rebrand reminders
 - App name: **mizemoon** (not rustdesk).
 - Rendezvous servers and pubkey customized in `libs/hbb_common/src/config.rs`.
