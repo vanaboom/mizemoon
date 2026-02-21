@@ -106,16 +106,18 @@ id "org.jetbrains.kotlin.android" version "1.9.10"
 ## Windows Build (Flutter, x64)
 ### Prerequisites
 - Visual Studio 2022 with `Desktop development with C++` workload.
+- LLVM (for `libclang.dll` used by Rust bindgen/hwcodec), e.g. `winget install LLVM.LLVM`.
 - Rust (MSVC toolchain): `rustup default stable-x86_64-pc-windows-msvc`
 - Flutter SDK for Windows and desktop enabled:
   - `flutter config --enable-windows-desktop`
   - `flutter doctor -v`
 - vcpkg with required libs:
-  - `vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static`
+  - `vcpkg install --classic ffmpeg[amf,nvcodec,qsv]:x64-windows-static mfx-dispatch:x64-windows-static libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static`
 
 ### Env (PowerShell example)
 ```powershell
 $env:VCPKG_ROOT = "C:\vcpkg"
+$env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
 $env:PATH = "C:\src\flutter\bin;$env:USERPROFILE\.cargo\bin;$env:PATH"
 ```
 
@@ -139,9 +141,19 @@ Or let build script trigger setup automatically:
 .\build-windows.ps1 -AutoSetup -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
 ```
 
+For verbose vcpkg diagnostics (especially when ffmpeg takes too long), add:
+```powershell
+.\build-windows.ps1 -AutoSetup -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps -VcpkgDebug
+```
+
+To auto-install missing Rust/Flutter tools too (full setup mode):
+```powershell
+.\build-windows.ps1 -AutoSetup -AutoSetupAllTools -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
+```
+
 Include Visual C++ Build Tools in auto setup if needed:
 ```powershell
-.\build-windows.ps1 -AutoSetup -InstallVisualCpp -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
+.\build-windows.ps1 -AutoSetup -AutoSetupAllTools -InstallVisualCpp -VcpkgRoot C:\dev\vcpkg -InstallMissingVcpkgDeps
 ```
 
 ### Outputs
@@ -152,8 +164,11 @@ Include Visual C++ Build Tools in auto setup if needed:
 - `build.py` now uses the active Python (`sys.executable`) for `pip` and helper scripts, so `python3/pip3` aliases are not required on Windows.
 - If you only want the Flutter exe and want to skip portable packing:
   - `python build.py --flutter --hwcodec --skip-portable-pack`
-- If `cargo/rustup/flutter/vcpkg` are missing, use `.\build-windows.ps1 -AutoSetup ...` or run `setup-windows-tools.ps1` first.
+- `-AutoSetup` in `build-windows.ps1` focuses on project deps (vcpkg + optional Visual C++), not full Rust/Flutter installation.
+- For full automatic tool install (Rust/Flutter/vcpkg/LLVM for libclang), use `-AutoSetup -AutoSetupAllTools` or run `setup-windows-tools.ps1` first.
 - `build-windows.ps1` tries to load Visual C++ environment automatically via `vswhere` + `vcvars64.bat` if `cl.exe` is not already in PATH.
+- `build-windows.ps1` now refreshes Flutter metadata before build (`.flutter-plugins*` cleanup + `flutter pub get`) to reduce plugin file lock/write failures.
+- On Windows, Flutter plugin builds require symlink support. Enable Developer Mode (`start ms-settings:developers`) or run the shell as Administrator.
 
 ## Rebrand reminders
 - App name: **mizemoon** (not rustdesk).

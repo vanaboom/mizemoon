@@ -9,7 +9,9 @@ param(
     [switch]$SkipFlutterDoctor,
     [switch]$AllowNonMSVCToolchain,
     [switch]$AutoSetup,
-    [switch]$InstallVisualCpp
+    [switch]$AutoSetupAllTools,
+    [switch]$InstallVisualCpp,
+    [switch]$VcpkgDebug
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,10 +29,138 @@ function Resolve-Tool([string]$Name) {
     return $cmd.Source
 }
 
+function Resolve-LibclangDirectory {
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:LIBCLANG_PATH)) {
+        $candidates += $env:LIBCLANG_PATH
+    }
+    $candidates += @(
+        "C:\Program Files\LLVM\bin",
+        "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\x64\bin",
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin"
+    )
+    foreach ($candidate in ($candidates | Where-Object { $_ } | Select-Object -Unique)) {
+        if (-not (Test-Path $candidate)) {
+            continue
+        }
+        if ((Get-Item $candidate).PSIsContainer) {
+            $libclangDll = Join-Path $candidate "libclang.dll"
+            $clangDll = Join-Path $candidate "clang.dll"
+            if ((Test-Path $libclangDll) -or (Test-Path $clangDll)) {
+                return (Resolve-Path $candidate).Path
+            }
+        } else {
+            $leaf = Split-Path -Leaf $candidate
+            if ($leaf -in @("libclang.dll", "clang.dll")) {
+                return (Resolve-Path (Split-Path -Parent $candidate)).Path
+            }
+        }
+    }
+    return $null
+}
+
 function Invoke-External([string]$Exe, [string[]]$CmdArgs) {
     & $Exe @CmdArgs
     if ($LASTEXITCODE -ne 0) {
         Fail "Command failed ($LASTEXITCODE): $Exe $($CmdArgs -join ' ')"
+    }
+}
+
+function Prepare-FlutterProject([string]$FlutterProjectDir, [string]$FlutterExePath) {
+    if (-not (Test-Path $FlutterProjectDir)) {
+        Fail "Flutter project directory not found: $FlutterProjectDir"
+    }
+
+    $runningFlutter = Get-Process -Name "flutter", "dart" -ErrorAction SilentlyContinue
+    if ($runningFlutter) {
+        $procList = ($runningFlutter | Select-Object -ExpandProperty Id) -join ", "
+        Write-Warning "Detected running flutter/dart process(es): $procList. They may lock Flutter metadata files."
+    }
+
+    $probeFile = Join-Path $FlutterProjectDir ".build-windows-write-probe"
+    try {
+        Set-Content -LiteralPath $probeFile -Value "ok" -Encoding ASCII -ErrorAction Stop
+        Remove-Item -LiteralPath $probeFile -Force -ErrorAction Stop
+    } catch {
+        Fail "Flutter project is not writable: $FlutterProjectDir. $($_.Exception.Message)"
+    }
+
+    foreach ($name in @(".flutter-plugins", ".flutter-plugins-dependencies")) {
+        $path = Join-Path $FlutterProjectDir $name
+        if (Test-Path -LiteralPath $path) {
+            try {
+                attrib -R $path 2>$null | Out-Null
+                Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+                Write-Host "Removed stale Flutter metadata file: $name"
+            } catch {
+                Write-Warning "Could not remove $path. Build may fail if the file is locked. $($_.Exception.Message)"
+            }
+        }
+    }
+
+    Push-Location $FlutterProjectDir
+    try {
+        Write-Host "Running flutter pub get ..."
+        Invoke-External $FlutterExePath @("pub", "get")
+    } finally {
+        Pop-Location
+    }
+}
+
+function Test-SymlinkSupport([string]$Dir) {
+    $target = Join-Path $Dir "pubspec.yaml"
+    if (-not (Test-Path -LiteralPath $target)) {
+        return $false
+    }
+    $link = Join-Path $Dir ".symlink-perm-check"
+    try {
+        if (Test-Path -LiteralPath $link) {
+            Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -ItemType SymbolicLink -Path $link -Target $target -ErrorAction Stop | Out-Null
+        Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        return $true
+    } catch {
+        if (Test-Path -LiteralPath $link) {
+            Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        }
+        return $false
+    }
+}
+
+function Show-VcpkgFfmpegLogTail([string]$VcpkgRootPath, [int]$TailLines = 60) {
+    $ffmpegTree = Join-Path $VcpkgRootPath "buildtrees\ffmpeg"
+    if (-not (Test-Path $ffmpegTree)) {
+        Write-Warning "ffmpeg buildtree not found at $ffmpegTree"
+        return
+    }
+    $logs = Get-ChildItem -Path $ffmpegTree -Filter "*.log" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 3
+    if (-not $logs) {
+        Write-Warning "No ffmpeg logs found in $ffmpegTree"
+        return
+    }
+    Write-Host "Latest ffmpeg logs:"
+    foreach ($log in $logs) {
+        Write-Host "---- $($log.Name) [$($log.LastWriteTime)] ----"
+        Get-Content -Path $log.FullName -Tail $TailLines -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-VcpkgInstall([string]$VcpkgExePath, [string[]]$Packages, [string]$VcpkgRootPath, [bool]$EnableDebug) {
+    $installArgs = @("install", "--classic")
+    if ($EnableDebug) {
+        $installArgs += "--debug"
+    }
+    $installArgs += $Packages
+
+    Write-Host "Running: $VcpkgExePath $($installArgs -join ' ')"
+    & $VcpkgExePath @installArgs
+    if ($LASTEXITCODE -ne 0) {
+        Show-VcpkgFfmpegLogTail -VcpkgRootPath $VcpkgRootPath -TailLines 80
+        Fail "Command failed ($LASTEXITCODE): $VcpkgExePath $($installArgs -join ' ')"
     }
 }
 
@@ -123,24 +253,44 @@ function Invoke-AutoSetupIfNeeded([string]$Reason) {
         Fail "Auto setup requested, but setup script not found: $setupScript"
     }
 
-    $setupArgs = @()
+    $setupParams = [ordered]@{}
     if ($VcpkgRoot) {
-        $setupArgs += @("-VcpkgRoot", $VcpkgRoot)
+        $setupParams["VcpkgRoot"] = $VcpkgRoot
     }
     if ($ToolsRoot) {
-        $setupArgs += @("-ToolsRoot", $ToolsRoot)
+        $setupParams["ToolsRoot"] = $ToolsRoot
     }
-    $setupArgs += "-InstallVcpkgDeps"
+    $setupParams["InstallVcpkgDeps"] = $true
     if ($InstallVisualCpp) {
-        $setupArgs += "-InstallVisualCpp"
+        $setupParams["InstallVisualCpp"] = $true
     }
     if ($SkipFlutterDoctor) {
-        $setupArgs += "-SkipFlutterDoctor"
+        $setupParams["SkipFlutterDoctor"] = $true
+    }
+    if ($VcpkgDebug) {
+        $setupParams["VcpkgDebug"] = $true
+    }
+    if (-not $AutoSetupAllTools) {
+        $setupParams["SkipRustSetup"] = $true
+        $setupParams["SkipFlutterSetup"] = $true
+        $setupParams["SkipLibclangSetup"] = $true
+    }
+
+    $setupArgsForDisplay = @()
+    foreach ($name in $setupParams.Keys) {
+        $value = $setupParams[$name]
+        if ($value -is [bool]) {
+            if ($value) {
+                $setupArgsForDisplay += "-$name"
+            }
+        } else {
+            $setupArgsForDisplay += @("-$name", "$value")
+        }
     }
 
     Write-Host "Auto setup triggered: $Reason"
-    Write-Host "Running setup script: $setupScript $($setupArgs -join ' ')"
-    & $setupScript @setupArgs
+    Write-Host "Running setup script: $setupScript $($setupArgsForDisplay -join ' ')"
+    & $setupScript @setupParams
     if ($LASTEXITCODE -ne 0) {
         Fail "Auto setup failed ($LASTEXITCODE)."
     }
@@ -195,16 +345,21 @@ if (-not $tools.rustup) { $missingToolNames += "rustup" }
 if (-not $tools.flutter) { $missingToolNames += "flutter" }
 
 if ($missingToolNames.Count -gt 0) {
-    Invoke-AutoSetupIfNeeded ("missing tools: " + ($missingToolNames -join ", "))
-    $tools = Refresh-Tools
-    $missingToolNames = @()
-    if (-not $tools.cargo) { $missingToolNames += "cargo" }
-    if (-not $tools.rustup) { $missingToolNames += "rustup" }
-    if (-not $tools.flutter) { $missingToolNames += "flutter" }
+    if ($AutoSetup -and $AutoSetupAllTools) {
+        Invoke-AutoSetupIfNeeded ("missing tools: " + ($missingToolNames -join ", "))
+        $tools = Refresh-Tools
+        $missingToolNames = @()
+        if (-not $tools.cargo) { $missingToolNames += "cargo" }
+        if (-not $tools.rustup) { $missingToolNames += "rustup" }
+        if (-not $tools.flutter) { $missingToolNames += "flutter" }
+    }
 }
 
 if ($missingToolNames.Count -gt 0) {
-    Fail "Missing tools in PATH: $($missingToolNames -join ', '). Run setup-windows-tools.ps1 or use -AutoSetup."
+    if ($AutoSetup -and -not $AutoSetupAllTools) {
+        Fail "Missing tools in PATH: $($missingToolNames -join ', '). -AutoSetup currently installs project deps only (vcpkg). Install tools manually or run with -AutoSetupAllTools."
+    }
+    Fail "Missing tools in PATH: $($missingToolNames -join ', '). Run setup-windows-tools.ps1 or use -AutoSetup -AutoSetupAllTools."
 }
 
 $pythonExe = $tools.python
@@ -248,6 +403,7 @@ if (-not (Test-Path $vcpkgExe)) {
         Fail "vcpkg.exe not found at $vcpkgExe"
     }
 }
+$vcpkgRootResolved = Split-Path -Parent $vcpkgExe
 
 $toolchain = (& $rustupExe show active-toolchain) 2>$null
 if (-not $AllowNonMSVCToolchain -and ($toolchain -notmatch "x86_64-pc-windows-msvc")) {
@@ -260,18 +416,95 @@ if ($installedTargets -notcontains "x86_64-pc-windows-msvc") {
     Invoke-External $rustupExe @("target", "add", "x86_64-pc-windows-msvc")
 }
 
+function Get-VcpkgListText([string]$VcpkgExePath) {
+    $lines = (& $VcpkgExePath list --classic) 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $lines) {
+        $lines = (& $VcpkgExePath list) 2>$null
+    }
+    if (-not $lines) {
+        return ""
+    }
+    return ($lines | Out-String)
+}
+
+function Parse-VcpkgPackageSpec([string]$PackageSpec) {
+    $parts = $PackageSpec.Split(":", 2)
+    if ($parts.Count -ne 2) {
+        return $null
+    }
+    $namePart = $parts[0].Trim()
+    $triplet = $parts[1].Trim()
+    if ([string]::IsNullOrWhiteSpace($namePart) -or [string]::IsNullOrWhiteSpace($triplet)) {
+        return $null
+    }
+    $name = $namePart
+    $features = @()
+    if ($namePart -match "^(?<name>[^\[]+)\[(?<features>[^\]]+)\]$") {
+        $name = $Matches["name"].Trim()
+        $features = $Matches["features"].Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
+    return @{
+        Name = $name
+        Triplet = $triplet
+        Features = $features
+    }
+}
+
+function Test-VcpkgPackageInstalled([string]$PackageSpec, [string]$VcpkgRootPath, [string]$VcpkgListText) {
+    $spec = Parse-VcpkgPackageSpec $PackageSpec
+    if ($null -eq $spec) {
+        return $false
+    }
+
+    $name = $spec.Name
+    $triplet = $spec.Triplet
+    $requiredFeatures = @($spec.Features)
+
+    # Fast path for packages without feature requirements.
+    $shareCopyright = Join-Path $VcpkgRootPath ("installed\" + $triplet + "\share\" + $name + "\copyright")
+    if ((Test-Path $shareCopyright) -and $requiredFeatures.Count -eq 0) {
+        return $true
+    }
+
+    if ([string]::IsNullOrWhiteSpace($VcpkgListText)) {
+        return (Test-Path $shareCopyright) -and $requiredFeatures.Count -eq 0
+    }
+
+    $pattern = "(?m)^" + [Regex]::Escape($name) + "(?:\[(?<features>[^\]]+)\])?:" + [Regex]::Escape($triplet) + "\s"
+    $match = [Regex]::Match($VcpkgListText, $pattern)
+    if (-not $match.Success) {
+        return $false
+    }
+    if ($requiredFeatures.Count -eq 0) {
+        return $true
+    }
+
+    $installedFeaturesText = $match.Groups["features"].Value
+    if ([string]::IsNullOrWhiteSpace($installedFeaturesText)) {
+        return $false
+    }
+    $installedFeatures = $installedFeaturesText.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    foreach ($feature in $requiredFeatures) {
+        if ($installedFeatures -notcontains $feature) {
+            return $false
+        }
+    }
+    return $true
+}
+
 $requiredVcpkg = @(
+    "ffmpeg[amf,nvcodec,qsv]:x64-windows-static",
+    "mfx-dispatch:x64-windows-static",
     "libvpx:x64-windows-static",
     "libyuv:x64-windows-static",
     "opus:x64-windows-static",
     "aom:x64-windows-static"
 )
 
-$vcpkgList = (& $vcpkgExe list) 2>$null
+$vcpkgListText = Get-VcpkgListText $vcpkgExe
 $missingVcpkg = @()
 foreach ($pkg in $requiredVcpkg) {
-    $pattern = "^" + [Regex]::Escape($pkg) + "\s"
-    if (-not ($vcpkgList -match $pattern)) {
+    if (-not (Test-VcpkgPackageInstalled $pkg $env:VCPKG_ROOT $vcpkgListText)) {
         $missingVcpkg += $pkg
     }
 }
@@ -279,14 +512,13 @@ foreach ($pkg in $requiredVcpkg) {
 if ($missingVcpkg.Count -gt 0) {
     if ($InstallMissingVcpkgDeps) {
         Write-Host "Installing missing vcpkg deps: $($missingVcpkg -join ', ')"
-        Invoke-External $vcpkgExe (@("install") + $missingVcpkg)
+        Invoke-VcpkgInstall -VcpkgExePath $vcpkgExe -Packages $missingVcpkg -VcpkgRootPath $env:VCPKG_ROOT -EnableDebug $VcpkgDebug
     } elseif ($AutoSetup) {
         Invoke-AutoSetupIfNeeded ("missing vcpkg deps: " + ($missingVcpkg -join ", "))
-        $vcpkgList = (& $vcpkgExe list) 2>$null
+        $vcpkgListText = Get-VcpkgListText $vcpkgExe
         $missingVcpkg = @()
         foreach ($pkg in $requiredVcpkg) {
-            $pattern = "^" + [Regex]::Escape($pkg) + "\s"
-            if (-not ($vcpkgList -match $pattern)) {
+            if (-not (Test-VcpkgPackageInstalled $pkg $env:VCPKG_ROOT $vcpkgListText)) {
                 $missingVcpkg += $pkg
             }
         }
@@ -294,13 +526,18 @@ if ($missingVcpkg.Count -gt 0) {
             Fail "Missing vcpkg deps after auto setup: $($missingVcpkg -join ', ')"
         }
     } else {
-        Fail "Missing vcpkg deps: $($missingVcpkg -join ', '). Run: `"$vcpkgExe`" install $($missingVcpkg -join ' ')"
+        Fail "Missing vcpkg deps: $($missingVcpkg -join ', '). Run: `"$vcpkgExe`" install --classic $($missingVcpkg -join ' ')"
     }
 }
 
 $clExe = Resolve-Tool "cl"
 if (-not $clExe) {
     if (Try-LoadVisualCppEnvironment) {
+        # vcvars can overwrite VCPKG_ROOT (often to VS-internal vcpkg path). Restore project-selected vcpkg.
+        if ($env:VCPKG_ROOT -ne $vcpkgRootResolved) {
+            Write-Host "Restoring VCPKG_ROOT to: $vcpkgRootResolved"
+            $env:VCPKG_ROOT = $vcpkgRootResolved
+        }
         $clExe = Resolve-Tool "cl"
     }
 }
@@ -314,6 +551,22 @@ if (-not $clExe) {
     Write-Warning "cl.exe not found in PATH. Build can fail without Visual Studio C++ tools. Use 'Developer PowerShell for VS 2022'."
 }
 
+$libclangDir = Resolve-LibclangDirectory
+if (-not $NoHwcodec) {
+    if (-not $libclangDir -and $AutoSetup -and $AutoSetupAllTools) {
+        Invoke-AutoSetupIfNeeded "libclang missing"
+        $libclangDir = Resolve-LibclangDirectory
+    }
+    if (-not $libclangDir) {
+        if ($AutoSetup -and -not $AutoSetupAllTools) {
+            Fail "libclang is missing (required by hwcodec/bindgen). Install LLVM and set LIBCLANG_PATH, or run with -AutoSetupAllTools."
+        }
+        Fail "libclang is missing (required by hwcodec/bindgen). Install LLVM (winget id: LLVM.LLVM) and set LIBCLANG_PATH to the folder containing libclang.dll."
+    }
+    $env:LIBCLANG_PATH = $libclangDir
+    Write-Host "Using LIBCLANG_PATH: $libclangDir"
+}
+
 Write-Host "Enabling Flutter Windows desktop ..."
 Invoke-External $flutterExe @("config", "--enable-windows-desktop")
 
@@ -321,6 +574,12 @@ if (-not $SkipFlutterDoctor) {
     Write-Host "Running flutter doctor ..."
     Invoke-External $flutterExe @("doctor", "-v")
 }
+
+$flutterProjectDir = Join-Path $repoRoot "flutter"
+if (-not (Test-SymlinkSupport $flutterProjectDir)) {
+    Fail "Flutter plugin builds on Windows require symlink support. Enable Developer Mode (run: start ms-settings:developers) or run this shell as Administrator, then retry."
+}
+Prepare-FlutterProject -FlutterProjectDir $flutterProjectDir -FlutterExePath $flutterExe
 
 $buildArgs = @("build.py", "--flutter")
 if (-not $NoHwcodec) {
